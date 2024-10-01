@@ -21,5 +21,5 @@ Write some ADVANCED code implementations in Go ...... to deepen understanding an
 - [x] 支持路由注册、HandlerFunc 绑定
 - [x] 基础前缀树路由
 - [x] 支持动态路由
-- [ ] 支持路由组
-- [ ] 支持 Middleware 设计
+- [x] 支持路由组
+- [x] 支持 Middleware 设计

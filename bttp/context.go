@@ -18,6 +18,21 @@ type Context struct {
 	Params map[string]string
 	// filled by resp
 	StatusCode int
+	// middleware related
+	idx         int
+	middlewares []Handler
+}
+
+func (c *Context) Next() {
+	c.idx++
+	for c.idx < len(c.middlewares) {
+		c.middlewares[c.idx](c)
+		c.idx++
+	}
+}
+
+func (c *Context) Abort() {
+	c.idx = len(c.middlewares)
 }
 
 func newContext(w http.ResponseWriter, req *http.Request) *Context {
@@ -26,6 +41,7 @@ func newContext(w http.ResponseWriter, req *http.Request) *Context {
 		Req:    req,
 		Path:   req.URL.Path,
 		Method: req.Method,
+		idx:    -1,
 	}
 }
 
@@ -75,4 +91,11 @@ func (c *Context) HTML(code int, html string) {
 	c.SetHeader("Content-Type", "text/html")
 	c.Status(code)
 	c.Writer.Write([]byte(html))
+}
+
+func (c *Context) InternalError(msg string) {
+	c.SetHeader("Content-Type", "text/html")
+	c.Status(http.StatusInternalServerError)
+	c.Writer.Write([]byte(msg))
+
 }

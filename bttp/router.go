@@ -34,15 +34,20 @@ func (r *router) addRoute(method string, pattern string, handler Handler) {
 
 func (r *router) handle(c *Context) {
 	n, params := r.getRoute(c.Method, c.Path)
+	var key string
 	if n != nil {
 		c.Params = params
+		key = c.Method + "-" + n.pattern
 	}
-	key := c.Method + "-" + n.pattern
-	if handler, ok := r.handlers[key]; ok {
-		handler(c)
+
+	if handler, ok := r.handlers[key]; ok && n != nil {
+		c.middlewares = append(c.middlewares, handler)
 	} else {
-		c.String(http.StatusNotFound, "404 NOT FOUND: %s\n", c.Path)
+		c.middlewares = append(c.middlewares, func(c *Context) {
+			c.String(http.StatusNotFound, "404 NOT FOUND: %s\n", c.Path)
+		})
 	}
+	c.Next()
 }
 
 func (r *router) getRoute(method string, pattern string) (*treeNode, map[string]string) {
@@ -89,4 +94,40 @@ func parsePattern(pattern string) []string {
 		}
 	}
 	return subPath
+}
+
+type RouterGroup struct {
+	prefix      string
+	middlewares []Handler
+	parent      *RouterGroup
+	engine      *Engine
+}
+
+func (rg *RouterGroup) Group(prefix string) *RouterGroup {
+	e := rg.engine
+	newGroup := &RouterGroup{
+		prefix:      e.prefix + prefix,
+		middlewares: make([]Handler, 0),
+		parent:      rg,
+		engine:      e,
+	}
+	e.groups = append(e.groups, newGroup)
+	return newGroup
+}
+
+func (rg *RouterGroup) Use(middlewares ...Handler) {
+	rg.middlewares = append(rg.middlewares, middlewares...)
+}
+
+func (rg *RouterGroup) addRoute(method string, pattern string, handler Handler) {
+	fullPattern := rg.prefix + pattern
+	rg.engine.router.addRoute(method, fullPattern, handler)
+}
+
+func (rg *RouterGroup) GET(pattern string, handler Handler) {
+	rg.addRoute("GET", pattern, handler)
+}
+
+func (rg *RouterGroup) POST(pattern string, handler Handler) {
+	rg.addRoute("POST", pattern, handler)
 }
