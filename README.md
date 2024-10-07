@@ -7,7 +7,7 @@ Write some ADVANCED code implementations in Go ...... to deepen understanding an
 
 代码于 `goX/lrux` 中
 
-在 Innodb 中采用了区分 Young 和 Old（Non-Young） 区的[LRU 优化方案](https://dev.mysql.com/doc/refman/8.4/en/innodb-buffer-pool.html)，本实践简单实现了双区域的划分。
+在 Innodb 中采用了区分 Young 和 Old（Non-Young） 区的 [LRU 优化方案](https://dev.mysql.com/doc/refman/8.4/en/innodb-buffer-pool.html)，本实践简单实现了双区域的划分。
 
 
 ### 2. Web Framework Based On net/http
@@ -37,3 +37,17 @@ Write some ADVANCED code implementations in Go ...... to deepen understanding an
 - [x] 支持用户自定义哈希函数
 - [ ] 支持 kv 过期
 - [ ] 支持 下线节点/上线节点 时触发数据自动迁移
+
+### 4. RPC Framework Designed Like `net/rpc`
+
+代码于 `goX/brpc` 中
+
+代码和架构风格参考 `net/rpc` 库源码与 [GeeRPC](https://geektutu.com/post/geerpc.html)，重写实现了若干增强方法。
+
+**TODO-LIST**
+
+- [x] 多应用层编解码协议协商
+- [x] 客户端/服务端支持并发、异步调用
+- [x] 加入客户端/服务端的超时控制机制
+- [ ] 客户端自动 failover
+- [ ] 对接注册发现中心
