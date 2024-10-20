@@ -2,7 +2,7 @@ package brpc
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"github.com/bswaterb/goX/brpc/codec"
@@ -100,8 +100,22 @@ func NewClient(conn net.Conn, opt *Option) (*Client, error) {
 		return nil, err
 	}
 	// send options with server
-	if err := json.NewEncoder(conn).Encode(opt); err != nil {
-		log.Println("rpc client: options error: ", err)
+	//jsonData, err := json.Marshal(*opt)
+	//if err != nil {
+	//	log.Println("rpc client: json option marshal error:", err)
+	//	return nil, err
+	//}
+	//jsonData = append(jsonData, '\n')
+
+	//if _, err := conn.Write(jsonData); err != nil {
+	//	log.Println("rpc client: options error: ", err)
+	//	_ = conn.Close()
+	//	return nil, err
+	//}
+
+	err := gob.NewEncoder(conn).Encode(*opt)
+	if err != nil {
+		log.Println("rpc client: send options error: ", err)
 		_ = conn.Close()
 		return nil, err
 	}
@@ -115,6 +129,7 @@ func newClientCodec(cc codec.Codec, opt *Option) *Client {
 		opt:     opt,
 		pending: make(map[uint64]*Call),
 	}
+	log.Printf("创建 client 成功，cc: %#v", cc.GetCC())
 	go client.receive()
 	return client
 }

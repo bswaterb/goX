@@ -43,6 +43,7 @@ Write some ADVANCED code implementations in Go ...... to deepen understanding an
 代码于 `goX/brpc` 中
 
 代码和架构风格参考 `net/rpc` 库源码与 [GeeRPC](https://geektutu.com/post/geerpc.html)，重写实现了若干增强方法。
+当前实现存在 bug，未对代码进行完善，等日后填坑。。。
 
 **TODO-LIST**
 
@@ -51,3 +52,15 @@ Write some ADVANCED code implementations in Go ...... to deepen understanding an
 - [x] 加入客户端/服务端的超时控制机制
 - [ ] 客户端自动 failover
 - [ ] 对接注册发现中心
+
+### 5. Hash Map 
+
+代码于 `goX/bmap` 中
+
+**TODO-LIST**
+
+- [ ] 并发检测
+- [ ] 自动扩容
+- [ ] hash-slot 仿 golang 原生的 bucket 实现
+- [ ] 细粒度锁
+- [ ] 泛型支持

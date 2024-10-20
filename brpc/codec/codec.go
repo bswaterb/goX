@@ -37,6 +37,8 @@ type Codec interface {
 	ReadBody(interface{}) error
 	// Write 向 io.Writer 写入响应的 header 和 body
 	Write(*Header, interface{}) error
+
+	GetCC() io.ReadWriteCloser
 }
 
 type Header struct {

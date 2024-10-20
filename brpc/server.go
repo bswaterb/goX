@@ -1,6 +1,9 @@
 package brpc
 
 import (
+	"bufio"
+	"bytes"
+	"encoding/gob"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -42,6 +45,7 @@ var DefaultServer = NewServer()
 // Server represents an RPC Server.
 type Server struct {
 	serviceMap sync.Map
+	readLock   sync.Mutex
 }
 
 func NewServer() *Server {
@@ -102,12 +106,18 @@ func (server *Server) ServeConn(conn io.ReadWriteCloser) {
 
 	var opt Option
 
-	if err := json.NewDecoder(conn).Decode(&opt); err != nil {
-		fmt.Println("brpc server: options error: ", err)
+	//if err := json.NewDecoder(conn).Decode(&opt); err != nil {
+	//	fmt.Println("brpc server: options error: ", err)
+	//	return
+	//}
+	// err := receiveMessageWithDelimiter(conn.(net.Conn), &opt)
+	err := gob.NewDecoder(conn).Decode(&opt)
+	if err != nil {
+		log.Printf("rpc server: failed to receive json option message %s", err)
 		return
 	}
 	if opt.MagicNumber != MagicNumber {
-		fmt.Printf("brpc server: invalid magic number %x", opt.MagicNumber)
+		log.Printf("brpc server: invalid magic number %x", opt.MagicNumber)
 		return
 	}
 	codecFuncMap := codec.GetCodecFuncMap()
@@ -116,12 +126,28 @@ func (server *Server) ServeConn(conn io.ReadWriteCloser) {
 		log.Printf("rpc server: invalid codec type %s", opt.CodecType)
 		return
 	}
-	server.serveCodec(f(conn))
+	log.Printf("brpc server: 新连接 %#v 建立成功，编码类型: %s\n", conn, opt.CodecType)
+	server.serveCodec(f(conn), &opt)
+}
+
+func receiveMessageWithDelimiter(conn net.Conn, data interface{}) error {
+	reader := bufio.NewReader(conn)
+
+	jsonData, err := reader.ReadBytes('\n')
+	if err != nil {
+		return err
+	}
+
+	jsonData = bytes.TrimRight(jsonData, "\n")
+	if err := json.Unmarshal(jsonData, data); err != nil {
+		return err
+	}
+	return nil
 }
 
 var invalidRequest = struct{}{}
 
-func (server *Server) serveCodec(cc codec.Codec) {
+func (server *Server) serveCodec(cc codec.Codec, opt *Option) {
 	var sending sync.Mutex // make sure to send a complete response
 	var wg sync.WaitGroup  // wait until all request are handled
 
@@ -136,7 +162,7 @@ func (server *Server) serveCodec(cc codec.Codec) {
 			continue
 		}
 		wg.Add(1)
-		go server.handleRequest(cc, req, &sending, &wg, time.Second*10)
+		go server.handleRequest(cc, req, &sending, &wg, opt.HandleTimeout)
 	}
 	wg.Wait()
 	_ = cc.Close()
@@ -154,7 +180,7 @@ func (server *Server) readRequestHeader(cc codec.Codec) (*codec.Header, error) {
 	var h codec.Header
 	if err := cc.ReadHeader(&h); err != nil {
 		if err != io.EOF && !errors.Is(err, io.ErrUnexpectedEOF) {
-			log.Printf("rpc server: read header error:%s, header:%#v\n", err, h)
+			log.Printf("rpc server: read header error:%s, cc:%#v\n", err, cc.GetCC())
 		}
 		return nil, err
 	}
@@ -162,6 +188,8 @@ func (server *Server) readRequestHeader(cc codec.Codec) (*codec.Header, error) {
 }
 
 func (server *Server) readRequest(cc codec.Codec) (*request, error) {
+	//server.readLock.Lock()
+	//defer server.readLock.Unlock()
 	h, err := server.readRequestHeader(cc)
 	if err != nil {
 		return nil, err
@@ -226,7 +254,6 @@ timeoutCheck:
 		select {
 		case <-ddl:
 			req.h.Err = fmt.Sprintf("rpc server: called successfully but sent timeout: expect within %s", timeout)
-			server.sendResponse(cc, req.h, invalidRequest, sending)
 		case <-sent:
 			break timeoutCheck
 		}

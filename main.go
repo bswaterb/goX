@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
 	"fmt"
 	"github.com/bswaterb/goX/brpc"
+	"github.com/bswaterb/goX/brpc/codec"
 	"github.com/bswaterb/goX/brpc/xclient"
 	"github.com/bswaterb/goX/bttp/middlewares"
 	"log"
@@ -17,6 +20,29 @@ import (
 
 func main() {
 	RunBrpc2()
+}
+
+func TestEnDecoder() {
+	h := &codec.Header{
+		ServiceMethod: "MyTest.Method",
+		Seq:           1,
+		Err:           "",
+	}
+	b := Args{
+		Num1: 1,
+		Num2: 2,
+	}
+
+	h2 := codec.Header{}
+	b2 := Args{}
+	buf := bytes.Buffer{}
+	_ = gob.NewEncoder(&buf).Encode(h)
+	_ = gob.NewEncoder(&buf).Encode(b)
+
+	_ = gob.NewDecoder(&buf).Decode(&h2)
+	_ = gob.NewDecoder(&buf).Decode(&b2)
+
+	fmt.Println(h, b)
 }
 
 func RunBttp() {
@@ -170,10 +196,15 @@ func RunBrpc1() {
 func startBrpcServer2(addrCh chan string) {
 	var foo Foo
 	l, _ := net.Listen("tcp", ":0")
-	server := brpc.NewServer()
-	_ = server.Register(&foo)
+	//server := brpc.NewServer()
+	//_ = server.Register(&foo)
+	err := brpc.Register(&foo)
+	if err != nil {
+		return
+	}
 	addrCh <- l.Addr().String()
-	server.Accept(l)
+
+	brpc.Accept(l)
 }
 
 func traceCallingLog(xc *xclient.XClient, ctx context.Context, typ, serviceMethod string, args *Args) {
@@ -202,7 +233,8 @@ func call(addr1, addr2 string) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			traceCallingLog(xc, context.Background(), "call", "Foo.Sum", &Args{Num1: i, Num2: i * i})
+			ctx, _ := context.WithTimeout(context.Background(), time.Second*2)
+			traceCallingLog(xc, ctx, "call", "Foo.Sum", &Args{Num1: i, Num2: i * i})
 		}(i)
 	}
 	wg.Wait()
@@ -219,7 +251,7 @@ func broadcast(addr1, addr2 string) {
 			defer wg.Done()
 			traceCallingLog(xc, context.Background(), "broadcast", "Foo.Sum", &Args{Num1: i, Num2: i * i})
 			// expect 2 - 5 timeout
-			ctx, _ := context.WithTimeout(context.Background(), time.Second*2)
+			ctx, _ := context.WithTimeout(context.Background(), time.Second*4)
 			traceCallingLog(xc, ctx, "broadcast", "Foo.Sleep", &Args{Num1: i, Num2: i * i})
 		}(i)
 	}
@@ -229,15 +261,55 @@ func broadcast(addr1, addr2 string) {
 func RunBrpc2() {
 	log.SetFlags(0)
 	ch1 := make(chan string)
-	ch2 := make(chan string)
+	// ch2 := make(chan string)
 	// start two servers
 	go startBrpcServer2(ch1)
-	go startBrpcServer2(ch2)
+	// go startBrpcServer2(ch2)
 
 	addr1 := <-ch1
-	addr2 := <-ch2
+	// addr2 := addr1
 
 	time.Sleep(time.Second)
-	call(addr1, addr2)
-	broadcast(addr1, addr2)
+	//l, _ := net.Dial("tcp", addr1)
+	//client, _ := brpc.NewClient(l, brpc.DefaultOption)
+	//defer func() { _ = client.Close() }()
+	//
+	//time.Sleep(time.Second * 1)
+	//
+	//buf := bytes.Buffer{}
+	//h := codec.Header{
+	//	ServiceMethod: "123",
+	//	Seq:           1,
+	//	Err:           "",
+	//}
+	//
+	//_ = gob.NewEncoder(&buf).Encode(h)
+	//l.Write(buf.Bytes()[:5])
+	//time.Sleep(time.Second * 5)
+	//l.Write(buf.Bytes()[5:])
+
+	//buf.Reset()
+	//rBuffer := make([]byte, 0, 1024)
+	//l.Read(rBuffer)
+	//
+	//fmt.Println(rBuffer)
+
+	client, _ := brpc.Dial("tcp", addr1)
+	// time.Sleep(time.Second * 60)
+	var wg sync.WaitGroup
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			_, _ = context.WithTimeout(context.Background(), time.Second*5)
+			var reply int
+			if err := client.Call(context.Background(), "Foo.Sum", &Args{Num1: i, Num2: i * i}, &reply); err != nil {
+				log.Println("call Foo.Sum error:", err)
+			}
+			log.Printf("%d + %d = %d\n", i, i*i, reply)
+		}(i)
+	}
+	wg.Wait()
+	// call(addr1, addr2)
+	// broadcast(addr1, addr2)
 }
