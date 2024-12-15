@@ -64,3 +64,17 @@ Write some ADVANCED code implementations in Go ...... to deepen understanding an
 - [ ] hash-slot 仿 golang 原生的 bucket 实现
 - [ ] 细粒度锁
 - [ ] 泛型支持
+
+### 6. HTTP Client
+
+代码位于 `goX/bhttpclient` 中
+
+**TODO-LIST**
+
+- [x] 以被调用服务为对象，同一个服务支持添加多个候选的 url
+- [x] 支持多 url 调用之间的负载均衡
+- [ ] 支持多 url 时的固定指向型调用
+- [x] 支持自动剔除错误率过高的某个 url，并在后台进行健康探测
+- [x] 支持统计调用的成功次数与错误次数
+- [ ] 支持 url 多方式调用（GET/POST/...）
+- [ ] 支持 client 对象的异步调用方式
